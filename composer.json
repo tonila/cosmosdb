@@ -1,8 +1,8 @@
 {
-  "name"       : "jupitern/cosmosdb",
+  "name"       : "tonila/cosmosdb",
   "description": "PHP wrapper for Azure Cosmos DB (formerly known as azure documentdb) using SQL rest api",
   "keywords"   : ["azure cosmosdb", "cosmosdb", "azure documentdb", "documentdb", "cosmosdb rest", "cosmosdb sql api rest"],
-  "homepage"   : "https://github.com/jupitern/cosmosdb",
+  "homepage"   : "https://github.com/tonila/cosmosdb",
   "license"    : "MIT",
   "authors"    : [
     {
@@ -11,12 +11,12 @@
       "role"    : "Developer"
     },
     {
-      
+
     }
   ],
   "support": {
-    "source": "https://github.com/jupitern/cosmosdb",
-    "issues": "https://github.com/jupitern/cosmosdb/issues"
+    "source": "https://github.com/tonila/cosmosdb",
+    "issues": "https://github.com/tonila/cosmosdb/issues"
   },
   "require"    :{
     "php":">=7.0",
