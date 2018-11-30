@@ -223,6 +223,39 @@ class QueryBuilder
         return $resultObj->_rid ?? null;
     }
 
+    /**
+     * @param $document
+     * @return Promise
+     * @throws \Exception
+     */
+    public function saveAsync($document)
+    {
+        $rid = null;
+
+        if (is_array($document) || is_object($document)) {
+            if (is_object($document) && isset($document->_rid)) $rid = $document->_rid;
+            elseif (is_array($document) && array_key_exists('_rid', $document)) $rid = $document['_rid'];
+
+            $document = json_encode($document);
+        }
+
+        return $this->connection->selectCollectionAsync($this->collection)->then(function($col) use($rid, $document) {
+
+            $promise = $rid ?
+            $col->replaceDocumentAcync($rid, $document) :
+            $col->createDocumentAsync($document);
+
+            return $promise->then(function($result) {
+                $resultObj = json_decode($result);
+
+                if (isset($resultObj->code) && isset($resultObj->message)) {
+                    throw new \Exception("$resultObj->code : $resultObj->message");
+                }
+                return $resultObj->_rid ?? null;
+            });
+        });
+    }
+
     /* DELETE */
 
     /**

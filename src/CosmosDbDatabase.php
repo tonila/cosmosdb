@@ -68,4 +68,38 @@ class CosmosDbDatabase
         }
     }
 
+    /**
+     * selectCollectionAsync
+     *
+     * @access public
+     * @param string $col_name Collection name
+     * @return Promise
+     */
+    public function selectCollectionAsync($col_name)
+    {
+        return $this->document_db->listCollectionsAsync($this->rid_db)->then(function($result) use($col_name){
+            $rid_col = false;
+            $object = json_decode($result);
+            $col_list = $object->DocumentCollections;
+            for ($i = 0; $i < count($col_list); $i++) {
+                if ($col_list[$i]->id === $col_name) {
+                    $rid_col = $col_list[$i]->_rid;
+                    break;
+                }
+            }
+            if (!$rid_col) {
+                return $this->document_db->createCollectionAsync($this->rid_db, '{"id":"' . $col_name . '"}')->then(function($result) {
+                    $object = json_decode($result);
+                    return $object->_rid;
+                });
+            }
+            return $rid_col;
+        })->then(function($rid_col) {
+            if ($rid_col) {
+                return new CosmosDbCollection($this->document_db, $this->rid_db, $rid_col);
+            } else {
+                return false;
+            }
+        });
+    }
 }

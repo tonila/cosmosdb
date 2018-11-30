@@ -94,6 +94,31 @@ class CosmosDbCollection
         return $this->document_db->replaceDocument($this->rid_db, $this->rid_col, $rid, $json);
     }
 
+        /**
+     * createDocumentAsync
+     *
+     * @access public
+     * @param string $json JSON formatted document
+     * @return Promise that resolves to JSON strings
+     */
+    public function createDocumentAsync($json)
+    {
+        return $this->document_db->createDocumentAsync($this->rid_db, $this->rid_col, $json);
+    }
+
+    /**
+     * replaceDocumentAsync
+     *
+     * @access public
+     * @param  string $rid document ResourceID (_rid)
+     * @param string $json JSON formatted document
+     * @return Promise that resolves to JSON strings
+     */
+    public function replaceDocumentAsync($rid, $json)
+    {
+        return $this->document_db->replaceDocumentAsync($this->rid_db, $this->rid_col, $rid, $json);
+    }
+
     /**
      * deleteDocument
      *

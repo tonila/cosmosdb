@@ -130,6 +130,36 @@ class CosmosDb
     }
 
     /**
+     * requestAsync
+     *
+     * use cURL functions
+     *
+     * @access private
+     * @param string $path request path
+     * @param string $method request method
+     * @param array $headers request headers
+     * @param string $body request body (JSON or QUERY)
+     * @return Promise that resolves to JSON response
+     */
+    private function requestAsync($path, $method, $headers, $body = NULL)
+    {
+        $client = new \GuzzleHttp\Client();
+
+        $options = [
+            'verify' => false,
+            'headers' => $headers,
+            'body' => $body,
+        ];
+
+        return $client->requestAsync($method, $this->host . $path, array_merge(
+            $options,
+            $this->httpClientOptions
+        ))->then(function ($response) {
+            return $response->getBody()->getContents();
+        });;
+    }
+
+    /**
      * selectDB
      *
      * @access public
@@ -361,6 +391,21 @@ class CosmosDb
     }
 
     /**
+     * listCollectionsAsync
+     *
+     * @link http://msdn.microsoft.com/en-us/library/azure/dn803935.aspx
+     * @access public
+     * @param string $rid_id Resource ID
+     * @return Promise that resolves to JSON response
+     */
+    public function listCollectionsAsync($rid_id)
+    {
+        $headers = $this->getAuthHeaders('GET', 'colls', $rid_id);
+        $headers['Content-Length'] = '0';
+        return $this->requestAsync("/dbs/" . $rid_id . "/colls", "GET", $headers);
+    }
+
+    /**
      * getCollection
      *
      * @link http://msdn.microsoft.com/en-us/library/azure/dn803951.aspx
@@ -390,6 +435,22 @@ class CosmosDb
         $headers = $this->getAuthHeaders('POST', 'colls', $rid_id);
         $headers['Content-Length'] = strlen($json);
         return $this->request("/dbs/" . $rid_id . "/colls", "POST", $headers, $json);
+    }
+
+    /**
+     * createCollectionAsync
+     *
+     * @link http://msdn.microsoft.com/en-us/library/azure/dn803934.aspx
+     * @access public
+     * @param string $rid_id Resource ID
+     * @param string $json JSON request
+     * @return Promise that resolves to JSON response
+     */
+    public function createCollectionAsync($rid_id, $json)
+    {
+        $headers = $this->getAuthHeaders('POST', 'colls', $rid_id);
+        $headers['Content-Length'] = strlen($json);
+        return $this->requestAsync("/dbs/" . $rid_id . "/colls", "POST", $headers, $json);
     }
 
     /**
@@ -478,6 +539,41 @@ class CosmosDb
         $headers = $this->getAuthHeaders('PUT', 'docs', $rid_doc);
         $headers['Content-Length'] = strlen($json);
         return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc, "PUT", $headers, $json);
+    }
+
+    /**
+     * createDocumentAsync
+     *
+     * @link http://msdn.microsoft.com/en-us/library/azure/dn803948.aspx
+     * @access public
+     * @param string $rid_id Resource ID
+     * @param string $rid_col Resource Collection ID
+     * @param string $json JSON request
+     * @return Promise, that resolves to JSON response
+     */
+    public function createDocumentAsync($rid_id, $rid_col, $json)
+    {
+        $headers = $this->getAuthHeaders('POST', 'docs', $rid_col);
+        $headers['Content-Length'] = strlen($json);
+        return $this->requestAsync("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs", "POST", $headers, $json);
+    }
+
+    /**
+     * replaceDocumentAsync
+     *
+     * @link http://msdn.microsoft.com/en-us/library/azure/dn803947.aspx
+     * @access public
+     * @param string $rid_id Resource ID
+     * @param string $rid_col Resource Collection ID
+     * @param string $rid_doc Resource Doc ID
+     * @param string $json JSON request
+     * @return Promise that resolves to JSON response
+     */
+    public function replaceDocumentAsync($rid_id, $rid_col, $rid_doc, $json)
+    {
+        $headers = $this->getAuthHeaders('PUT', 'docs', $rid_doc);
+        $headers['Content-Length'] = strlen($json);
+        return $this->requestAsync("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc, "PUT", $headers, $json);
     }
 
     /**
