@@ -81,13 +81,13 @@ class CosmosDb
         $x_ms_version = '2017-02-22';
 
         $key = base64_decode($this->master_key);
-        $string_to_sign = $verb . "\n" .
+        $string_to_sign = strtolower($verb) . "\n" .
             $resource_type . "\n" .
             $resource_id . "\n" .
-            $x_ms_date . "\n" .
+            strtolower($x_ms_date) . "\n" .
             "\n";
 
-        $sig = base64_encode(hash_hmac('sha256', strtolower($string_to_sign), $key, true));
+        $sig = base64_encode(hash_hmac('sha256', $string_to_sign, $key, true));
 
         return [
             'Accept' => 'application/json',
@@ -168,23 +168,7 @@ class CosmosDb
      */
     public function selectDB($db_name)
     {
-        $rid_db = false;
-        $object = json_decode($this->listDatabases());
-        $db_list = $object->Databases;
-        for ($i = 0; $i < count($db_list); $i++) {
-            if ($db_list[$i]->id === $db_name) {
-                $rid_db = $db_list[$i]->_rid;
-            }
-        }
-        if (!$rid_db) {
-            $object = json_decode($this->createDatabase('{"id":"' . $db_name . '"}'));
-            $rid_db = $object->_rid;
-        }
-        if ($rid_db) {
-            return new CosmosDbDatabase($this, $rid_db);
-        } else {
-            return false;
-        }
+        return new CosmosDbDatabase($this, $db_name);
     }
 
     /**
@@ -212,12 +196,14 @@ class CosmosDb
      */
     public function query($rid_id, $rid_col, $query)
     {
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs";
         $headers = $this->getAuthHeaders('POST', 'docs', $rid_col);
+
         $headers['Content-Length'] = strlen($query);
         $headers['Content-Type'] = 'application/query+json';
         $headers['x-ms-max-item-count'] = -1;
         $headers['x-ms-documentdb-isquery'] = True;
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs", "POST", $headers, $query);
+        return $this->request("/" . $resourceLink, "POST", $headers, $query);
     }
 
     /**
@@ -229,9 +215,10 @@ class CosmosDb
      */
     public function listDatabases()
     {
+        $resourceLink =  "dbs";
         $headers = $this->getAuthHeaders('GET', 'dbs', '');
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -244,9 +231,10 @@ class CosmosDb
      */
     public function getDatabase($rid_id)
     {
-        $headers = $this->getAuthHeaders('GET', 'dbs', $rid_id);
+        $resourceLink =  "dbs/" . $rid_id;
+        $headers = $this->getAuthHeaders('GET', 'dbs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id, "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -259,9 +247,10 @@ class CosmosDb
      */
     public function createDatabase($json)
     {
+        $resourceLink =  "dbs";
         $headers = $this->getAuthHeaders('POST', 'dbs', '');
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs", "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -275,9 +264,10 @@ class CosmosDb
      */
     public function replaceDatabase($rid_id, $json)
     {
-        $headers = $this->getAuthHeaders('PUT', 'dbs', $rid_id);
+        $resourceLink =  "dbs/" . $rid_id;
+        $headers = $this->getAuthHeaders('PUT', 'dbs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id, "PUT", $headers, $json);
+        return $this->request("/" . $resourceLink, "PUT", $headers, $json);
     }
 
     /**
@@ -290,90 +280,92 @@ class CosmosDb
      */
     public function deleteDatabase($rid_id)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'dbs', $rid_id);
+        $resourceLink =  "dbs/" . $rid_id;
+        $headers = $this->getAuthHeaders('DELETE', 'dbs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
-    /**
-     * listUsers
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803958.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @return string JSON response
-     */
-    public function listUsers($rid_id)
-    {
-        $headers = $this->getAuthHeaders('GET', 'users', $rid_id);
-        $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/users", "GET", $headers);
-    }
+    // /**
+    //  * TODO! NOT IMPLEMENTED
+    //  * listUsers
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803958.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @return string JSON response
+    //  */
+    // public function listUsers($rid_id)
+    // {
+    //     $headers = $this->getAuthHeaders('GET', 'users', $rid_id);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/dbs/" . $rid_id . "/users", "GET", $headers);
+    // }
 
-    /**
-     * getUser
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @return string JSON response
-     */
-    public function getUser($rid_id, $rid_user)
-    {
-        $headers = $this->getAuthHeaders('GET', 'users', $rid_user);
-        $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user, "GET", $headers);
-    }
+    // /**
+    //  * getUser
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @return string JSON response
+    //  */
+    // public function getUser($rid_id, $rid_user)
+    // {
+    //     $headers = $this->getAuthHeaders('GET', 'users', $rid_user);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user, "GET", $headers);
+    // }
 
-    /**
-     * createUser
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803946.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $json JSON request
-     * @return string JSON response
-     */
-    public function createUser($rid_id, $json)
-    {
-        $headers = $this->getAuthHeaders('POST', 'users', $rid_id);
-        $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/users", "POST", $headers, $json);
-    }
+    // /**
+    //  * createUser
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803946.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $json JSON request
+    //  * @return string JSON response
+    //  */
+    // public function createUser($rid_id, $json)
+    // {
+    //     $headers = $this->getAuthHeaders('POST', 'users', $rid_id);
+    //     $headers['Content-Length'] = strlen($json);
+    //     return $this->request("/dbs/" . $rid_id . "/users", "POST", $headers, $json);
+    // }
 
-    /**
-     * replaceUser
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803941.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @param string $json JSON request
-     * @return string JSON response
-     */
-    public function replaceUser($rid_id, $rid_user, $json)
-    {
-        $headers = $this->getAuthHeaders('PUT', 'users', $rid_user);
-        $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user, "PUT", $headers, $json);
-    }
+    // /**
+    //  * replaceUser
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803941.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @param string $json JSON request
+    //  * @return string JSON response
+    //  */
+    // public function replaceUser($rid_id, $rid_user, $json)
+    // {
+    //     $headers = $this->getAuthHeaders('PUT', 'users', $rid_user);
+    //     $headers['Content-Length'] = strlen($json);
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user, "PUT", $headers, $json);
+    // }
 
-    /**
-     * deleteUser
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803953.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @return string JSON response
-     */
-    public function deleteUser($rid_id, $rid_user)
-    {
-        $headers = $this->getAuthHeaders('DELETE', 'users', $rid_user);
-        $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user, "DELETE", $headers);
-    }
+    // /**
+    //  * deleteUser
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803953.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @return string JSON response
+    //  */
+    // public function deleteUser($rid_id, $rid_user)
+    // {
+    //     $headers = $this->getAuthHeaders('DELETE', 'users', $rid_user);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user, "DELETE", $headers);
+    // }
 
     /**
      * listCollections
@@ -385,24 +377,10 @@ class CosmosDb
      */
     public function listCollections($rid_id)
     {
-        $headers = $this->getAuthHeaders('GET', 'colls', $rid_id);
+        $resourceLink =  "dbs/" . $rid_id . "/colls";
+        $headers = $this->getAuthHeaders('GET', 'colls', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls", "GET", $headers);
-    }
-
-    /**
-     * listCollectionsAsync
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803935.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @return Promise that resolves to JSON response
-     */
-    public function listCollectionsAsync($rid_id)
-    {
-        $headers = $this->getAuthHeaders('GET', 'colls', $rid_id);
-        $headers['Content-Length'] = '0';
-        return $this->requestAsync("/dbs/" . $rid_id . "/colls", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -416,9 +394,10 @@ class CosmosDb
      */
     public function getCollection($rid_id, $rid_col)
     {
-        $headers = $this->getAuthHeaders('GET', 'colls', $rid_col);
+        $resourceLink =  "dbs/" . $rid_id . "/colls";
+        $headers = $this->getAuthHeaders('GET', 'colls', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col, "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -432,25 +411,10 @@ class CosmosDb
      */
     public function createCollection($rid_id, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'colls', $rid_id);
+        $resourceLink =  "dbs/" . $rid_id . "/colls";
+        $headers = $this->getAuthHeaders('POST', 'colls', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls", "POST", $headers, $json);
-    }
-
-    /**
-     * createCollectionAsync
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803934.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $json JSON request
-     * @return Promise that resolves to JSON response
-     */
-    public function createCollectionAsync($rid_id, $json)
-    {
-        $headers = $this->getAuthHeaders('POST', 'colls', $rid_id);
-        $headers['Content-Length'] = strlen($json);
-        return $this->requestAsync("/dbs/" . $rid_id . "/colls", "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -464,9 +428,10 @@ class CosmosDb
      */
     public function deleteCollection($rid_id, $rid_col)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'colls', $rid_col);
+        $resourceLink =  "dbs/" . $rid_id . "/colls/" . $rid_col;
+        $headers = $this->getAuthHeaders('DELETE', 'colls', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
     /**
@@ -480,9 +445,10 @@ class CosmosDb
      */
     public function listDocuments($rid_id, $rid_col)
     {
-        $headers = $this->getAuthHeaders('GET', 'docs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs";
+        $headers = $this->getAuthHeaders('GET', 'docs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -497,13 +463,14 @@ class CosmosDb
      */
     public function getDocument($rid_id, $rid_col, $rid_doc)
     {
-        $headers = $this->getAuthHeaders('GET', 'docs', $rid_doc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc;
+        $headers = $this->getAuthHeaders('GET', 'docs', $resourceLink);
         $headers['Content-Length'] = '0';
         $options = array(
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_HTTPGET => true,
         );
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc, "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -518,9 +485,10 @@ class CosmosDb
      */
     public function createDocument($rid_id, $rid_col, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'docs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs";
+        $headers = $this->getAuthHeaders('POST', 'docs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs", "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -536,9 +504,10 @@ class CosmosDb
      */
     public function replaceDocument($rid_id, $rid_col, $rid_doc, $json)
     {
-        $headers = $this->getAuthHeaders('PUT', 'docs', $rid_doc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc;
+        $headers = $this->getAuthHeaders('PUT', 'docs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc, "PUT", $headers, $json);
+        return $this->request("/" . $resourceLink, "PUT", $headers, $json);
     }
 
     /**
@@ -553,9 +522,10 @@ class CosmosDb
      */
     public function createDocumentAsync($rid_id, $rid_col, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'docs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs";
+        $headers = $this->getAuthHeaders('POST', 'docs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->requestAsync("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs", "POST", $headers, $json);
+        return $this->requestAsync("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -571,9 +541,10 @@ class CosmosDb
      */
     public function replaceDocumentAsync($rid_id, $rid_col, $rid_doc, $json)
     {
-        $headers = $this->getAuthHeaders('PUT', 'docs', $rid_doc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc;
+        $headers = $this->getAuthHeaders('PUT', 'docs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->requestAsync("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc, "PUT", $headers, $json);
+        return $this->requestAsync("/" . $resourceLink, "PUT", $headers, $json);
     }
 
     /**
@@ -588,9 +559,10 @@ class CosmosDb
      */
     public function deleteDocument($rid_id, $rid_col, $rid_doc)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'docs', $rid_doc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc;
+        $headers = $this->getAuthHeaders('DELETE', 'docs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
     /**
@@ -605,9 +577,10 @@ class CosmosDb
      */
     public function listAttachments($rid_id, $rid_col, $rid_doc)
     {
-        $headers = $this->getAuthHeaders('GET', 'attachments', $rid_doc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments";
+        $headers = $this->getAuthHeaders('GET', 'attachments', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -623,9 +596,10 @@ class CosmosDb
      */
     public function getAttachment($rid_id, $rid_col, $rid_doc, $rid_at)
     {
-        $headers = $this->getAuthHeaders('GET', 'attachments', $rid_at);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments/" . $rid_at;
+        $headers = $this->getAuthHeaders('GET', 'attachments', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments/" . $rid_at, "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -643,11 +617,12 @@ class CosmosDb
      */
     public function createAttachment($rid_id, $rid_col, $rid_doc, $content_type, $filename, $file)
     {
-        $headers = $this->getAuthHeaders('POST', 'attachments', $rid_doc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments";
+        $headers = $this->getAuthHeaders('POST', 'attachments', $resourceLink);
         $headers['Content-Length'] = strlen($file);
         $headers['Content-Type'] = $content_type;
         $headers['Slug'] = urlencode($filename);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments", "POST", $headers, $file);
+        return $this->request("/" . $resourceLink, "POST", $headers, $file);
     }
 
     /**
@@ -666,11 +641,12 @@ class CosmosDb
      */
     public function replaceAttachment($rid_id, $rid_col, $rid_doc, $rid_at, $content_type, $filename, $file)
     {
-        $headers = $this->getAuthHeaders('PUT', 'attachments', $rid_at);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments/" . $rid_at;
+        $headers = $this->getAuthHeaders('PUT', 'attachments', $resourceLink);
         $headers['Content-Length'] = strlen($file);
         $headers['Content-Type'] = $content_type;
         $headers['Slug'] = urlencode($filename);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments/" . $rid_at, "PUT", $headers, $file);
+        return $this->request("/" . $resourceLink, "PUT", $headers, $file);
     }
 
     /**
@@ -686,157 +662,159 @@ class CosmosDb
      */
     public function deleteAttachment($rid_id, $rid_col, $rid_doc, $rid_at)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'attachments', $rid_at);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments/" . $rid_at;
+        $headers = $this->getAuthHeaders('DELETE', 'attachments', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/docs/" . $rid_doc . "/attachments/" . $rid_at, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
-    /**
-     * listOffers
-     *
-     * @link http://
-     * @access public
-     * @return string JSON response
-     */
-    public function listOffers()
-    {
-        $headers = $this->getAuthHeaders('GET', 'offers', '');
-        $headers['Content-Length'] = '0';
-        return $this->request("/offers", "GET", $headers);
-    }
+    // /**
+    //  * TODO! NOT IMPLEMENTED
+    //  * listOffers
+    //  *
+    //  * @link http://
+    //  * @access public
+    //  * @return string JSON response
+    //  */
+    // public function listOffers()
+    // {
+    //     $headers = $this->getAuthHeaders('GET', 'offers', '');
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/offers", "GET", $headers);
+    // }
 
-    /**
-     * getOffer
-     *
-     * @link http://
-     * @access public
-     * @param string $rid Resource ID
-     * @return string JSON response
-     */
-    public function getOffer($rid)
-    {
-        $headers = $this->getAuthHeaders('GET', 'offers', $rid);
-        $headers['Content-Length'] = '0';
-        return $this->request("/offers/" . $rid, "GET", $headers);
-    }
+    // /**
+    //  * getOffer
+    //  *
+    //  * @link http://
+    //  * @access public
+    //  * @param string $rid Resource ID
+    //  * @return string JSON response
+    //  */
+    // public function getOffer($rid)
+    // {
+    //     $headers = $this->getAuthHeaders('GET', 'offers', $rid);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/offers/" . $rid, "GET", $headers);
+    // }
 
-    /**
-     * replaceOffer
-     *
-     * @link http://
-     * @access public
-     * @param string $rid Resource ID
-     * @param string $json JSON request
-     * @return string JSON response
-     */
-    public function replaceOffer($rid, $json)
-    {
-        $headers = $this->getAuthHeaders('PUT', 'offers', $rid);
-        $headers['Content-Length'] = strlen($json);
-        return $this->request("/offers/" . $rid, "PUT", $headers, $json);
-    }
+    // /**
+    //  * replaceOffer
+    //  *
+    //  * @link http://
+    //  * @access public
+    //  * @param string $rid Resource ID
+    //  * @param string $json JSON request
+    //  * @return string JSON response
+    //  */
+    // public function replaceOffer($rid, $json)
+    // {
+    //     $headers = $this->getAuthHeaders('PUT', 'offers', $rid);
+    //     $headers['Content-Length'] = strlen($json);
+    //     return $this->request("/offers/" . $rid, "PUT", $headers, $json);
+    // }
 
-    /**
-     * queryingOffers
-     *
-     * @link http://
-     * @access public
-     * @param string $json JSON request
-     * @return string JSON response
-     */
-    public function queryingOffers($json)
-    {
-        $headers = $this->getAuthHeaders('POST', 'offers', '');
-        $headers['Content-Length'] = strlen($json);
-        $headers['Content-Type'] = 'application/query+json';
-        $headers['x-ms-documentdb-isquery'] = 'True';
-        return $this->request("/offers", "POST", $headers, $json);
-    }
+    // /**
+    //  * queryingOffers
+    //  *
+    //  * @link http://
+    //  * @access public
+    //  * @param string $json JSON request
+    //  * @return string JSON response
+    //  */
+    // public function queryingOffers($json)
+    // {
+    //     $headers = $this->getAuthHeaders('POST', 'offers', '');
+    //     $headers['Content-Length'] = strlen($json);
+    //     $headers['Content-Type'] = 'application/query+json';
+    //     $headers['x-ms-documentdb-isquery'] = 'True';
+    //     return $this->request("/offers", "POST", $headers, $json);
+    // }
 
-    /**
-     * listPermissions
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @return string JSON response
-     */
-    public function listPermissions($rid_id, $rid_user)
-    {
-        $headers = $this->getAuthHeaders('GET', 'permissions', $rid_user);
-        $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions", "GET", $headers);
-    }
+    // /**
+    //  * listPermissions
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @return string JSON response
+    //  */
+    // public function listPermissions($rid_id, $rid_user)
+    // {
+    //     $headers = $this->getAuthHeaders('GET', 'permissions', $rid_user);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions", "GET", $headers);
+    // }
 
-    /**
-     * createPermission
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803946.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @param string $json JSON request
-     * @return string JSON response
-     */
-    public function createPermission($rid_id, $rid_user, $json)
-    {
-        $headers = $this->getAuthHeaders('POST', 'permissions', $rid_user);
-        $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions", "POST", $headers, $json);
-    }
+    // /**
+    //  * createPermission
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803946.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @param string $json JSON request
+    //  * @return string JSON response
+    //  */
+    // public function createPermission($rid_id, $rid_user, $json)
+    // {
+    //     $headers = $this->getAuthHeaders('POST', 'permissions', $rid_user);
+    //     $headers['Content-Length'] = strlen($json);
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions", "POST", $headers, $json);
+    // }
 
-    /**
-     * getPermission
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @param string $rid_permission Resource Permission ID
-     * @return string JSON response
-     */
-    public function getPermission($rid_id, $rid_user, $rid_permission)
-    {
-        $headers = $this->getAuthHeaders('GET', 'permissions', $rid_permission);
-        $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions/" . $rid_permission, "GET", $headers);
-    }
+    // /**
+    //  * getPermission
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @param string $rid_permission Resource Permission ID
+    //  * @return string JSON response
+    //  */
+    // public function getPermission($rid_id, $rid_user, $rid_permission)
+    // {
+    //     $headers = $this->getAuthHeaders('GET', 'permissions', $rid_permission);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions/" . $rid_permission, "GET", $headers);
+    // }
 
-    /**
-     * replacePermission
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @param string $rid_permission Resource Permission ID
-     * @param string $json JSON request
-     * @return string JSON response
-     */
-    public function replacePermission($rid_id, $rid_user, $rid_permission, $json)
-    {
-        $headers = $this->getAuthHeaders('PUT', 'permissions', $rid_permission);
-        $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions/" . $rid_permission, "PUT", $headers, $json);
-    }
+    // /**
+    //  * replacePermission
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @param string $rid_permission Resource Permission ID
+    //  * @param string $json JSON request
+    //  * @return string JSON response
+    //  */
+    // public function replacePermission($rid_id, $rid_user, $rid_permission, $json)
+    // {
+    //     $headers = $this->getAuthHeaders('PUT', 'permissions', $rid_permission);
+    //     $headers['Content-Length'] = strlen($json);
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions/" . $rid_permission, "PUT", $headers, $json);
+    // }
 
-    /**
-     * deletePermission
-     *
-     * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
-     * @access public
-     * @param string $rid_id Resource ID
-     * @param string $rid_user Resource User ID
-     * @param string $rid_permission Resource Permission ID
-     * @return string JSON response
-     */
-    public function deletePermission($rid_id, $rid_user, $rid_permission)
-    {
-        $headers = $this->getAuthHeaders('DELETE', 'permissions', $rid_permission);
-        $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions/" . $rid_permission, "DELETE", $headers);
-    }
+    // /**
+    //  * deletePermission
+    //  *
+    //  * @link http://msdn.microsoft.com/en-us/library/azure/dn803949.aspx
+    //  * @access public
+    //  * @param string $rid_id Resource ID
+    //  * @param string $rid_user Resource User ID
+    //  * @param string $rid_permission Resource Permission ID
+    //  * @return string JSON response
+    //  */
+    // public function deletePermission($rid_id, $rid_user, $rid_permission)
+    // {
+    //     $headers = $this->getAuthHeaders('DELETE', 'permissions', $rid_permission);
+    //     $headers['Content-Length'] = '0';
+    //     return $this->request("/dbs/" . $rid_id . "/users/" . $rid_user . "/permissions/" . $rid_permission, "DELETE", $headers);
+    // }
 
     /**
      * listStoredProcedures
@@ -849,9 +827,10 @@ class CosmosDb
      */
     public function listStoredProcedures($rid_id, $rid_col)
     {
-        $headers = $this->getAuthHeaders('GET', 'sprocs', $rid_col);
+        $resourceLink = "/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs";
+        $headers = $this->getAuthHeaders('GET', 'sprocs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -867,9 +846,10 @@ class CosmosDb
      */
     public function executeStoredProcedure($rid_id, $rid_col, $rid_sproc, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'sprocs', $rid_sproc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs/" . $rid_sproc;
+        $headers = $this->getAuthHeaders('POST', 'sprocs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs/" . $rid_sproc, "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -884,9 +864,10 @@ class CosmosDb
      */
     public function createStoredProcedure($rid_id, $rid_col, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'sprocs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs";
+        $headers = $this->getAuthHeaders('POST', 'sprocs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs", "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -902,9 +883,10 @@ class CosmosDb
      */
     public function replaceStoredProcedure($rid_id, $rid_col, $rid_sproc, $json)
     {
-        $headers = $this->getAuthHeaders('PUT', 'sprocs', $rid_sproc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs/" . $rid_sproc;
+        $headers = $this->getAuthHeaders('PUT', 'sprocs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs/" . $rid_sproc, "PUT", $headers, $json);
+        return $this->request("/" . $resourceLink, "PUT", $headers, $json);
     }
 
     /**
@@ -919,9 +901,10 @@ class CosmosDb
      */
     public function deleteStoredProcedure($rid_id, $rid_col, $rid_sproc)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'sprocs', $rid_sproc);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs/" . $rid_sproc;
+        $headers = $this->getAuthHeaders('DELETE', 'sprocs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs/" . $rid_sproc, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
     /**
@@ -935,9 +918,10 @@ class CosmosDb
      */
     public function listUserDefinedFunctions($rid_id, $rid_col)
     {
-        $headers = $this->getAuthHeaders('GET', 'udfs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs";
+        $headers = $this->getAuthHeaders('GET', 'udfs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -952,9 +936,10 @@ class CosmosDb
      */
     public function createUserDefinedFunction($rid_id, $rid_col, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'udfs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs";
+        $headers = $this->getAuthHeaders('POST', 'udfs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs", "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -970,9 +955,10 @@ class CosmosDb
      */
     public function replaceUserDefinedFunction($rid_id, $rid_col, $rid_udf, $json)
     {
-        $headers = $this->getAuthHeaders('PUT', 'udfs', $rid_udf);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs/" . $rid_udf;
+        $headers = $this->getAuthHeaders('PUT', 'udfs', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs/" . $rid_udf, "PUT", $headers, $json);
+        return $this->request("/" . $resourceLink, "PUT", $headers, $json);
     }
 
     /**
@@ -987,9 +973,10 @@ class CosmosDb
      */
     public function deleteUserDefinedFunction($rid_id, $rid_col, $rid_udf)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'udfs', $rid_udf);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs/" . $rid_udf;
+        $headers = $this->getAuthHeaders('DELETE', 'udfs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/udfs/" . $rid_udf, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
     /**
@@ -1003,9 +990,10 @@ class CosmosDb
      */
     public function listTriggers($rid_id, $rid_col)
     {
-        $headers = $this->getAuthHeaders('GET', 'triggers', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers";
+        $headers = $this->getAuthHeaders('GET', 'triggers', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers", "GET", $headers);
+        return $this->request("/" . $resourceLink, "GET", $headers);
     }
 
     /**
@@ -1020,9 +1008,10 @@ class CosmosDb
      */
     public function createTrigger($rid_id, $rid_col, $json)
     {
-        $headers = $this->getAuthHeaders('POST', 'triggers', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers";
+        $headers = $this->getAuthHeaders('POST', 'triggers', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers", "POST", $headers, $json);
+        return $this->request("/" . $resourceLink, "POST", $headers, $json);
     }
 
     /**
@@ -1038,9 +1027,10 @@ class CosmosDb
      */
     public function replaceTrigger($rid_id, $rid_col, $rid_trigger, $json)
     {
-        $headers = $this->getAuthHeaders('PUT', 'triggers', $rid_trigger);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers/" . $rid_trigger;
+        $headers = $this->getAuthHeaders('PUT', 'triggers', $resourceLink);
         $headers['Content-Length'] = strlen($json);
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers/" . $rid_trigger, "PUT", $headers, $json);
+        return $this->request("/" . $resourceLink, "PUT", $headers, $json);
     }
 
     /**
@@ -1055,9 +1045,10 @@ class CosmosDb
      */
     public function deleteTrigger($rid_id, $rid_col, $rid_trigger)
     {
-        $headers = $this->getAuthHeaders('DELETE', 'triggers', $rid_trigger);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers/" . $rid_trigger;
+        $headers = $this->getAuthHeaders('DELETE', 'triggers', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/dbs/" . $rid_id . "/colls/" . $rid_col . "/triggers/" . $rid_trigger, "DELETE", $headers);
+        return $this->request("/" . $resourceLink, "DELETE", $headers);
     }
 
 }
