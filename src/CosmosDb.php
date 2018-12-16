@@ -196,14 +196,14 @@ class CosmosDb
      */
     public function query($rid_id, $rid_col, $query)
     {
-        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col . "/docs";
-        $headers = $this->getAuthHeaders('POST', 'docs', $rid_col);
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col;
+        $headers = $this->getAuthHeaders('POST', 'docs', $resourceLink);
 
         $headers['Content-Length'] = strlen($query);
         $headers['Content-Type'] = 'application/query+json';
         $headers['x-ms-max-item-count'] = -1;
         $headers['x-ms-documentdb-isquery'] = True;
-        return $this->request("/" . $resourceLink, "POST", $headers, $query);
+        return $this->request($resourceLink . "/docs", "POST", $headers, $query);
     }
 
     /**
@@ -377,10 +377,10 @@ class CosmosDb
      */
     public function listCollections($rid_id)
     {
-        $resourceLink =  "dbs/" . $rid_id . "/colls";
+        $resourceLink =  "dbs/" . $rid_id;
         $headers = $this->getAuthHeaders('GET', 'colls', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/" . $resourceLink, "GET", $headers);
+        return $this->request("/" . $resourceLink . "/colls", "GET", $headers);
     }
 
     /**
@@ -827,10 +827,10 @@ class CosmosDb
      */
     public function listStoredProcedures($rid_id, $rid_col)
     {
-        $resourceLink = "/dbs/" . $rid_id . "/colls/" . $rid_col . "/sprocs";
+        $resourceLink = "dbs/" . $rid_id . "/colls/" . $rid_col;
         $headers = $this->getAuthHeaders('GET', 'sprocs', $resourceLink);
         $headers['Content-Length'] = '0';
-        return $this->request("/" . $resourceLink, "GET", $headers);
+        return $this->request("/" . $resourceLink . "/sprocs", "GET", $headers);
     }
 
     /**
